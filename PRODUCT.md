@@ -30,46 +30,31 @@ exactly as it did before, and nothing had to be factory reset.
 - Setting brightness or colour on a lamp that is off also turns it on. Typing a
   command is an unambiguous statement of intent.
 
-## The reactive layer
+- Named colours are tuned for an LED rather than a screen, and every one is
+  overridable in config. Hardware never matches the ideal on paper, so the
+  calibration knob stays.
 
-A single `lamp tick` reconciler on a 30s launch agent — not a daemon, not a set
-of calendar jobs. Three inputs, decided in one pure function (`resolve()` in
-`rules.ts`) that needs no hardware to test:
+## Deliberately not automated
 
-- **Time of day** sets the brightness baseline.
-- **Media** caps brightness while audio plays. Only ever dims.
-- **Theme** supplies the colour, read out of swatch's own files.
+An earlier version had a reconciler on a 30 second launch agent: time-of-day
+brightness, dimming while audio played, colour following the active swatch
+theme. It worked, and it was removed.
 
-### The one thing the design got wrong
+The reason is that a lamp is not a system that benefits from converging on a
+desired state. Every rule needed a guard to stop it feeling haunted — never
+power on, hold off for two hours after a manual command, hand back control on
+`lamp off` — and the guards existed entirely to make automation stop doing
+things. When the guards are the interesting part, the feature is arguing with
+its user. Typing `lamp red` is already fast.
 
-"Colour and brightness are separate dimensions, so they can't fight" is only
-half true: the lamp has a single colour *mode*, so a kelvin and an RGB value
-cannot both apply. The schedule breaks the tie — a slot that names a `kelvin`
-claims the colour dimension, a slot without one lets the theme accent through.
-That is a better answer than a priority order would have given, because it is
-what actually wanted expressing: theme colour by day, warm by night.
+What the attempt did establish, for anyone tempted again:
 
-### Guards
-
-- The reconciler **never turns the lamp on**, only adjusts one already on. It
-  cannot light an empty room, and an unreachable lamp is a silent no-op.
-- A manual command **pins the state** for two hours or until `lamp off`, so
-  automation can never stomp a deliberate action.
-- Only the difference is sent, so a steady state is completely silent on the
-  wire.
-
-### Detecting media
-
-Not Cider's API. The `coreaudiod` power assertion covers Cider, Music.app,
-`jazz` and the browser at once, needs no application token, and cannot be
-broken by Cider changing its API. A short system sound could in principle
-trigger a dim, but with a 30 second tick the odds of sampling one are slight
-and the cost is a brief dim.
-
-## Where it's headed
-
-Nothing planned. The remaining known softness is that `lamp setup` is only
-exercised by its unit tests and one live login.
+- The lamp has a single colour *mode*, so kelvin and RGB cannot both apply.
+  "Colour and brightness are separate dimensions" is only half true.
+- `pmset -g assertions | grep coreaudiod` is a zero-config "is audio playing"
+  signal on macOS, covering Cider, Music.app and the browser at once.
+- The active swatch theme is readable without modifying swatch: the theme name
+  from the Ghostty config it generates, the accent from the palette beside it.
 
 ## Not doing
 

@@ -1,4 +1,4 @@
-.TH LAMP 1 "2026-08-05" "lamp 0.1.0" "User Commands"
+.TH LAMP 1 "2026-08-05" "lamp 0.2.0" "User Commands"
 .SH NAME
 lamp \- control the Mi Bedside Lamp 2 over the local network
 .SH SYNOPSIS
@@ -32,59 +32,32 @@ suffix is required, so that brightness and temperature cannot be confused.
 .BR warm ", " cool
 Shorthand for 2700k and 5000k.
 .TP
+.I name
+A named colour:
+.BR red ", " orange ", " amber ", " yellow ", " lime ", " green ", " mint ,
+.BR teal ", " cyan ", " azure ", " blue ", " indigo ", " violet ", " purple ,
+.BR magenta ", " pink ", " white .
+Case-insensitive. The values are tuned for an LED rather than a screen and can
+be overridden under
+.B [colours]
+in the configuration file.
+.TP
 .BI # rrggbb
-Set colour. The leading hash is optional.
+Set colour by hex. The leading hash is optional. A six-letter hex word is
+always read as hex, so a configured colour cannot shadow it.
 .TP
 .BI @ scene
 Apply a named scene from the configuration file.
 .TP
 .B status
-Print power, brightness, and current colour or temperature. Also reports how
-long a manual override still has to run.
-.SH AUTOMATION
-Any command typed by hand claims the lamp for two hours, or until
-.B lamp off
-is run. The reconciler leaves it alone for that long, so automation can never
-undo something done deliberately.
-.TP
-.B auto
-Hand control back to the reconciler immediately.
-.TP
-.B tick
-Apply the rules once. This is what the launch agent runs; it prints nothing and
-exits zero when there is nothing to do.
-.TP
-.BR "agent on" ", " "agent off"
-Install or remove the launch agent that runs
-.B tick
-every 30 seconds.
-.SH RULES
-The reconciler decides brightness and colour from three inputs, and
-.B never turns the lamp on
-\(em it only adjusts a lamp that is already on, so it cannot light an empty
-room. An unreachable lamp is a silent no-op.
-.TP
-.B Time of day
-The schedule sets the brightness baseline. The slot in force is the last one to
-have started, wrapping around midnight.
-.TP
-.B Media
-While any audio is playing, brightness is capped at
-.IR media.brightness .
-This only ever dims; it will not brighten a lamp the schedule has taken down
-for the night.
-.TP
-.B Theme
-The accent colour of the active swatch theme is read from swatch's own files.
-A schedule slot that names a
-.I kelvin
-takes the colour dimension for itself; a slot without one lets the accent show.
-.SH SETUP
+Print power, brightness, and current colour or temperature.
 .TP
 .B setup
-Fetch the device token from the Xiaomi cloud by QR code, then write it to the
-configuration file. Interactive: it opens a QR image to be scanned with the
-Xiaomi Home app. Needed once, and again only if the lamp is reset.
+Sign in to the Xiaomi cloud and write the device address and token to the
+configuration file. Interactive: it asks for the account and password, and
+handles the captcha and emailed two-factor code that the account may require.
+The password is not echoed and is never written to disk. Needed once, and again
+only if the lamp is reset.
 .SH OPTIONS
 .TP
 .BR \-h ", " \-\-help
@@ -92,14 +65,8 @@ Show help.
 .SH FILES
 .TP
 .I ~/.config/lamp/config.toml
-Device address, token, scenes, and rules. Contains a device credential and
-should be mode 600.
-.TP
-.I ~/.local/state/lamp/state.json
-When the current manual override expires.
-.TP
-.I ~/Library/Logs/lamp.log
-Launch agent errors.
+Device address, token, scenes, and colour overrides. Contains a device
+credential and should be mode 600.
 .SH CONFIGURATION
 .EX
 ip = "192.168.1.4"
@@ -113,24 +80,14 @@ kelvin = 4000
 brightness = 5
 rgb = "#ff3000"
 
-[[schedule]]
-from = "18:00"
-brightness = 50
-
-[[schedule]]
-from = "23:00"
-brightness = 25
-kelvin = 2200
-
-[media]
-brightness = 30
+[colours]
+blue = "#0033cc"
 .EE
 .PP
 The token is a 32 character hex string, written by
 .BR "lamp setup" .
-Omitting
-.I schedule
-entirely disables the reactive layer.
+Colour overrides are applied one at a time over the built-in names, so setting
+one does not remove the others.
 .SH EXIT STATUS
 Exits non-zero if the configuration is missing or invalid, if the argument is
 not understood, or if the lamp does not answer. A lamp that is switched off at

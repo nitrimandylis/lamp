@@ -1,16 +1,18 @@
-// One-time token retrieval from the Xiaomi cloud, by QR code.
+// One-time token retrieval from the Xiaomi cloud, by username and password.
 //
-// Ported from PiotrMachowski/Xiaomi-cloud-tokens-extractor (MIT). Only the
-// QR-code path is here: the password path is what breaks with "Access denied"
-// once an account has two-factor verification on it, which is most of them.
+// Ported from PiotrMachowski/Xiaomi-cloud-tokens-extractor (MIT).
 //
-// Nothing in here is needed after the token is in config.toml.
+// The naive password login — the one `miiocli cloud` uses — fails with "Access
+// denied" on any account that has a captcha or two-factor verification on it,
+// which is most of them now. What makes this work is answering both challenges:
+// the captcha image and the emailed code are handled below.
+//
+// Nothing in here is needed once the token is in config.toml.
 
-import { createHash, createHmac, createCipheriv, randomBytes } from "node:crypto";
+import { createHash, createCipheriv, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const LOGIN_URL = "https://account.xiaomi.com/longPolling/loginUrl";
 // The servers Xiaomi runs, in the order worth trying from Europe.
 export const SERVERS = ["de", "i2", "ru", "sg", "us", "cn"];
 
@@ -24,6 +26,9 @@ function randomAgent(): string {
     Array.from({ length: n }, () => String.fromCharCode(from + Math.floor(Math.random() * (to - from + 1)))).join("");
   return `${letters(18, 97, 122)}-${letters(13, 65, 69)} APP/com.xiaomi.mihome APPV/10.5.201`;
 }
+
+const randomDeviceId = () =>
+  Array.from({ length: 6 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join("");
 
 export function generateNonce(millis: number): string {
   const stamp = Buffer.alloc(4);
@@ -71,87 +76,295 @@ function encParams(url: string, nonceSigned: string, nonce: string, data: string
   return params;
 }
 
-/** Follow redirects by hand, collecting Set-Cookie from every hop. */
-async function fetchCollectingCookies(url: string): Promise<Map<string, string>> {
-  const jar = new Map<string, string>();
-  let next = url;
-  for (let hop = 0; hop < 6; hop++) {
-    const res = await fetch(next, {
-      redirect: "manual",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-    });
-    for (const raw of res.headers.getSetCookie()) {
-      const [pair] = raw.split(";");
-      const idx = pair!.indexOf("=");
-      if (idx > 0) jar.set(pair!.slice(0, idx).trim(), pair!.slice(idx + 1).trim());
-    }
-    const location = res.headers.get("location");
-    if (!location) return jar;
-    next = new URL(location, next).toString();
+// --- cookies -----------------------------------------------------------------
+
+type Cookie = { name: string; value: string; domain: string };
+
+/**
+ * The login walks across account.xiaomi.com, sts.api.io.mi.com and back, and
+ * each hop depends on cookies the previous one set. Bun's fetch has no cookie
+ * jar, so this is the smallest one that keeps domains apart — which matters,
+ * because `serviceToken` is set by more than one host and only the STS one is
+ * the credential the API wants.
+ */
+export class Jar {
+  private cookies: Cookie[] = [];
+
+  static hostMatches(host: string, domain: string): boolean {
+    if (!domain.startsWith(".")) return host === domain;
+    return host === domain.slice(1) || host.endsWith(domain);
   }
-  return jar;
+
+  set(name: string, value: string, domain: string): void {
+    const existing = this.cookies.find((c) => c.name === name && c.domain === domain);
+    if (existing) existing.value = value;
+    else this.cookies.push({ name, value, domain });
+  }
+
+  absorb(response: Response, requestUrl: string): void {
+    const host = new URL(requestUrl).hostname;
+    for (const raw of response.headers.getSetCookie()) {
+      const [pair, ...attrs] = raw.split(";");
+      const eq = pair!.indexOf("=");
+      if (eq <= 0) continue;
+      const domainAttr = attrs.map((a) => a.trim()).find((a) => a.toLowerCase().startsWith("domain="));
+      const domain = domainAttr ? domainAttr.slice(7).trim() : host;
+      this.set(pair!.slice(0, eq).trim(), pair!.slice(eq + 1).trim(), domain);
+    }
+  }
+
+  header(url: string): string {
+    const host = new URL(url).hostname;
+    return this.cookies
+      .filter((c) => Jar.hostMatches(host, c.domain))
+      .map((c) => `${c.name}=${c.value}`)
+      .join("; ");
+  }
+
+  get(name: string, domainSuffix?: string): string | undefined {
+    const matches = this.cookies.filter((c) => c.name === name && (!domainSuffix || c.domain.endsWith(domainSuffix)));
+    return matches[matches.length - 1]?.value;
+  }
+}
+
+// --- terminal prompts ---------------------------------------------------------
+
+export async function ask(prompt: string): Promise<string> {
+  process.stdout.write(prompt);
+  for await (const line of console) return line.trim();
+  return "";
+}
+
+/** Read a line without echoing it, so the password never lands on screen. */
+async function askHidden(prompt: string): Promise<string> {
+  process.stdout.write(prompt);
+  if (!process.stdin.isTTY) return ask("");
+
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  let out = "";
+  try {
+    for await (const chunk of process.stdin) {
+      for (const byte of chunk as Buffer) {
+        if (byte === 3) throw new Error("cancelled");
+        if (byte === 13 || byte === 10) {
+          process.stdout.write("\n");
+          return out;
+        }
+        if (byte === 127 || byte === 8) out = out.slice(0, -1);
+        else out += String.fromCharCode(byte);
+      }
+    }
+  } finally {
+    process.stdin.setRawMode(false);
+    process.stdin.pause();
+  }
+  return out;
+}
+
+// --- HTTP ---------------------------------------------------------------------
+
+type ReqOptions = {
+  method?: "GET" | "POST";
+  query?: Record<string, string>;
+  form?: Record<string, string>;
+  follow?: boolean;
+};
+
+/** One jar-aware request, with redirects followed by hand so cookies are collected at every hop. */
+async function req(jar: Jar, agent: string, url: string, opts: ReqOptions = {}): Promise<{ res: Response; url: string; body: string }> {
+  let target = opts.query ? `${url}?${new URLSearchParams(opts.query)}` : url;
+  let method = opts.method ?? "GET";
+  let body = opts.form ? new URLSearchParams(opts.form).toString() : undefined;
+
+  for (let hop = 0; hop < 8; hop++) {
+    const res = await fetch(target, {
+      method,
+      body,
+      redirect: "manual",
+      headers: {
+        "User-Agent": agent,
+        "Content-Type": "application/x-www-form-urlencoded",
+        Cookie: jar.header(target),
+      },
+    });
+    jar.absorb(res, target);
+
+    const location = res.headers.get("location");
+    if (!opts.follow || !location) return { res, url: target, body: await res.text() };
+
+    target = new URL(location, target).toString();
+    // A redirect after a POST continues as a GET, exactly as a browser would.
+    method = "GET";
+    body = undefined;
+  }
+  throw new Error("too many redirects while signing in");
 }
 
 const stripPrefix = (text: string) => JSON.parse(text.replace("&&&START&&&", ""));
 
+async function showImage(bytes: ArrayBuffer, name: string, label: string): Promise<void> {
+  const path = join(tmpdir(), name);
+  await Bun.write(path, bytes);
+  Bun.spawn(["open", path]).unref();
+  console.log(`${label} (opened ${path})`);
+}
+
+// --- login --------------------------------------------------------------------
+
 export type Session = { userId: string; ssecurity: string; serviceToken: string; agent: string };
 
 /**
- * Sign in by QR code. Deliberately not password-based: this path never touches
- * a password and never triggers the two-factor email loop, which is subject to
- * a 3-5 per day cap per region.
+ * The email two-factor flow, reached when the server answers the password with
+ * a notificationUrl instead of an ssecurity.
+ *
+ * The prize is buried oddly: `ssecurity` comes back in an `extension-pragma`
+ * response *header* on the Auth2/end hop, not in any body, and it is only there
+ * if that hop is inspected without following its redirect.
  */
-export async function qrLogin(log: (s: string) => void): Promise<Session> {
-  const agent = randomAgent();
+async function twoFactor(jar: Jar, agent: string, notificationUrl: string): Promise<string> {
+  const context = new URL(notificationUrl).searchParams.get("context");
+  if (!context) throw new Error("two-factor URL had no context");
 
-  const query = new URLSearchParams({
-    _qrsize: "480",
-    qs: "%3Fsid%3Dxiaomiio%26_json%3Dtrue",
-    callback: "https://sts.api.io.mi.com/sts",
-    _hasLogo: "false",
-    sid: "xiaomiio",
-    serviceParam: "",
-    _locale: "en_GB",
-    _dc: String(Date.now()),
+  await req(jar, agent, notificationUrl, { follow: true });
+  await req(jar, agent, "https://account.xiaomi.com/identity/list", {
+    query: { sid: "xiaomiio", context, _locale: "en_US" },
   });
-  const start = await fetch(`${LOGIN_URL}?${query}`, { headers: { "User-Agent": agent } });
-  if (!start.ok) throw new Error(`could not start login (HTTP ${start.status})`);
-  const info = stripPrefix(await start.text()) as { qr: string; loginUrl: string; lp: string; timeout: number };
-  if (!info.qr) throw new Error("Xiaomi did not return a QR code");
 
-  const image = await fetch(info.qr);
-  const path = join(tmpdir(), "lamp-login-qr.png");
-  await Bun.write(path, await image.arrayBuffer());
-  Bun.spawn(["open", path]).unref();
+  await req(jar, agent, "https://account.xiaomi.com/identity/auth/sendEmailTicket", {
+    method: "POST",
+    query: { _dc: String(Date.now()), sid: "xiaomiio", context, mask: "0", _locale: "en_US" },
+    form: { retry: "0", icode: "", _json: "true", ick: jar.get("ick") ?? "" },
+  });
 
-  log("Scan the QR code that just opened with the Xiaomi Home app.");
-  log(`If it did not open: ${path}`);
-  log(`Or visit: ${info.loginUrl}`);
-  log("Waiting...");
+  console.log("\nTwo-factor verification required. Xiaomi has emailed you a code.");
+  const code = await ask("Code from the email: ");
 
-  // Long poll: the server holds the request open until the phone confirms, so
-  // a timeout is normal and simply means "ask again".
-  const deadline = Date.now() + (info.timeout ?? 300) * 1000;
-  let confirmed: { userId: number; ssecurity: string; location: string } | null = null;
-  while (Date.now() < deadline) {
-    try {
-      const poll = await fetch(info.lp, { headers: { "User-Agent": agent }, signal: AbortSignal.timeout(10_000) });
-      if (poll.ok) {
-        confirmed = stripPrefix(await poll.text());
-        break;
-      }
-    } catch {
-      // timed out waiting for the scan; poll again
+  const verify = await req(jar, agent, "https://account.xiaomi.com/identity/auth/verifyEmail", {
+    method: "POST",
+    query: { _flag: "8", _json: "true", sid: "xiaomiio", context, mask: "0", _locale: "en_US" },
+    form: { _flag: "8", ticket: code, trust: "false", _json: "true", ick: jar.get("ick") ?? "" },
+  });
+
+  let finish: string | undefined;
+  try {
+    finish = stripPrefix(verify.body).location;
+  } catch {
+    finish = verify.res.headers.get("location") ?? undefined;
+  }
+  if (!finish) {
+    const check = await req(jar, agent, "https://account.xiaomi.com/identity/result/check", {
+      query: { sid: "xiaomiio", context, _locale: "en_US" },
+    });
+    finish = check.res.headers.get("location") ?? undefined;
+  }
+  if (!finish) throw new Error("wrong or expired code");
+
+  let endUrl = finish;
+  if (finish.includes("identity/result/check")) {
+    const hop = await req(jar, agent, finish);
+    endUrl = hop.res.headers.get("location") ?? "";
+  }
+  if (!endUrl) throw new Error("could not follow the verification through");
+
+  let end = await req(jar, agent, endUrl);
+  // The first call sometimes returns an interstitial page; the redirect and the
+  // extension-pragma header only appear on the second.
+  if (end.res.status === 200 && end.body.includes("Xiaomi Account - Tips")) end = await req(jar, agent, endUrl);
+
+  const pragma = end.res.headers.get("extension-pragma");
+  const ssecurity = pragma ? JSON.parse(pragma).ssecurity : undefined;
+  if (!ssecurity) throw new Error("verification finished but no ssecurity came back");
+
+  let sts = end.res.headers.get("location");
+  if (!sts) {
+    const found = end.body.match(/https:\/\/sts\.api\.io\.mi\.com\/sts[^"']*/);
+    sts = found?.[0] ?? null;
+  }
+  if (!sts) throw new Error("verification finished but no service-token redirect came back");
+  await req(jar, agent, sts, { follow: true });
+
+  return ssecurity;
+}
+
+export async function passwordLogin(): Promise<Session> {
+  const agent = randomAgent();
+  const deviceId = randomDeviceId();
+  const jar = new Jar();
+  for (const domain of [".mi.com", ".xiaomi.com"]) {
+    jar.set("sdkVersion", "accountsdk-18.8.15", domain);
+    jar.set("deviceId", deviceId, domain);
+  }
+
+  const username = await ask("Xiaomi account (email, phone or user ID): ");
+  const password = await askHidden("Password (not shown): ");
+  if (!username || !password) throw new Error("username and password are both required");
+
+  // Step 1: ask what this account needs. Either a signing token comes back, or
+  // the account is somehow already authenticated and we are done early.
+  jar.set("userId", username, "account.xiaomi.com");
+  const first = await req(jar, agent, "https://account.xiaomi.com/pass/serviceLogin", {
+    query: { sid: "xiaomiio", _json: "true" },
+  });
+  const start = stripPrefix(first.body);
+  let ssecurity: string | undefined = start.ssecurity;
+  let userId: string | undefined = start.userId ? String(start.userId) : undefined;
+  let location: string | undefined = start.location;
+
+  if (!ssecurity) {
+    if (!start._sign) throw new Error("unknown account — check the email, phone number or user ID");
+
+    // Step 2: the password itself, sent as an uppercase MD5.
+    const fields: Record<string, string> = {
+      sid: "xiaomiio",
+      hash: createHash("md5").update(password, "utf8").digest("hex").toUpperCase(),
+      callback: "https://sts.api.io.mi.com/sts",
+      qs: "%3Fsid%3Dxiaomiio%26_json%3Dtrue",
+      user: username,
+      _sign: start._sign,
+      _json: "true",
+    };
+
+    let auth = await req(jar, agent, "https://account.xiaomi.com/pass/serviceLoginAuth2", { method: "POST", query: fields });
+    let result = stripPrefix(auth.body);
+
+    if (result.captchaUrl) {
+      const captchaUrl = result.captchaUrl.startsWith("/") ? `https://account.xiaomi.com${result.captchaUrl}` : result.captchaUrl;
+      const image = await fetch(captchaUrl, { headers: { "User-Agent": agent, Cookie: jar.header(captchaUrl) } });
+      jar.absorb(image, captchaUrl);
+      await showImage(await image.arrayBuffer(), "lamp-captcha.png", "Captcha required.");
+      fields.captCode = await ask("Captcha as shown (case-sensitive): ");
+
+      auth = await req(jar, agent, "https://account.xiaomi.com/pass/serviceLoginAuth2", { method: "POST", query: fields });
+      result = stripPrefix(auth.body);
+      if (result.code === 87001) throw new Error("captcha was wrong");
+    }
+
+    if (result.ssecurity && String(result.ssecurity).length > 4) {
+      ssecurity = result.ssecurity;
+      userId = result.userId ? String(result.userId) : undefined;
+      location = result.location;
+    } else if (result.notificationUrl) {
+      ssecurity = await twoFactor(jar, agent, result.notificationUrl);
+      userId = userId ?? jar.get("userId", ".xiaomi.com") ?? jar.get("userId", ".mi.com");
+    } else {
+      throw new Error("wrong password, or the account is locked");
     }
   }
-  if (!confirmed) throw new Error("timed out waiting for the QR code to be scanned");
 
-  const jar = await fetchCollectingCookies(confirmed.location);
-  const serviceToken = jar.get("serviceToken");
+  // Step 3: trade the location for the service token, unless two-factor
+  // already walked through the STS hop and left one in the jar.
+  if (location && !jar.get("serviceToken", ".mi.com")) await req(jar, agent, location, { follow: true });
+
+  const serviceToken = jar.get("serviceToken", ".mi.com") ?? jar.get("serviceToken");
   if (!serviceToken) throw new Error("signed in, but no service token came back");
+  if (!ssecurity) throw new Error("signed in, but no ssecurity came back");
+  if (!userId) throw new Error("signed in, but no user id came back");
 
-  return { userId: String(confirmed.userId), ssecurity: confirmed.ssecurity, serviceToken, agent };
+  return { userId, ssecurity, serviceToken, agent };
 }
+
+// --- device list --------------------------------------------------------------
 
 async function apiCall(session: Session, country: string, path: string, data: string): Promise<any> {
   const base = `https://${country === "cn" ? "" : country + "."}api.io.mi.com/app`;
