@@ -4,7 +4,7 @@
 // itself the maintained answer to the token problem that rytilahti/python-miio
 // exposes through `miiocli cloud`.
 //
-// The naive password login — the one `miiocli cloud` uses — fails with "Access
+// The naive password login, the one `miiocli cloud` uses, fails with "Access
 // denied" on any account that has a captcha or two-factor verification on it,
 // which is most of them now. What makes this work is answering both challenges:
 // the captcha image and the emailed code are handled below.
@@ -85,7 +85,7 @@ type Cookie = { name: string; value: string; domain: string };
 /**
  * The login walks across account.xiaomi.com, sts.api.io.mi.com and back, and
  * each hop depends on cookies the previous one set. Bun's fetch has no cookie
- * jar, so this is the smallest one that keeps domains apart — which matters,
+ * jar, so this is the smallest one that keeps domains apart, which matters,
  * because `serviceToken` is set by more than one host and only the STS one is
  * the credential the API wants.
  */
@@ -314,7 +314,7 @@ export async function passwordLogin(): Promise<Session> {
   let location: string | undefined = start.location;
 
   if (!ssecurity) {
-    if (!start._sign) throw new Error("unknown account — check the email, phone number or user ID");
+    if (!start._sign) throw new Error("unknown account. Check the email, phone number or user ID");
 
     // Step 2: the password itself, sent as an uppercase MD5.
     const fields: Record<string, string> = {
@@ -386,7 +386,7 @@ async function apiCall(session: Session, country: string, path: string, data: st
     "channel=MI_APP_STORE",
   ].join("; ");
 
-  // The parameters go in the query string, not the body — that is what the
+  // The parameters go in the query string, not the body. That is what the
   // signature was computed over.
   const res = await fetch(`${url}?${new URLSearchParams(params)}`, {
     method: "POST",

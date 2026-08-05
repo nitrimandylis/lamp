@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// lamp — local control for the Mi Bedside Lamp 2 over miIO.
+// lamp: local control for the Mi Bedside Lamp 2 over miIO.
 
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
@@ -18,7 +18,7 @@ const KELVIN_MIN = 1700;
 const KELVIN_MAX = 6500;
 const TRANSITION_MS = 500;
 
-const HELP = `lamp — control the Mi Bedside Lamp 2
+const HELP = `lamp: control the Mi Bedside Lamp 2
 
 Usage:
   lamp                 toggle on/off
@@ -58,7 +58,7 @@ export type Colours = Record<string, string>;
  *
  * Screen values do not carry over: #0000ff on this lamp reads as a dim violet,
  * and #ffff00 washes out to near-white. These are pulled towards what the lamp
- * actually shows. Override any of them under [colours] in config.toml — the
+ * actually shows. Override any of them under [colours] in config.toml. The
  * right values depend on the bulb and the room.
  */
 export const NAMED_COLOURS: Colours = {
@@ -102,7 +102,7 @@ function sceneCmds(scene: Scene): Cmd[] {
 }
 
 /**
- * Read one value word — a brightness, a temperature, or a colour — into the
+ * Read one value word (a brightness, a temperature, or a colour) into the
  * dimension it sets. Returns null if the word is not a value at all.
  *
  * The single definition of what "80", "2700k", "warm" and "red" mean, shared by
@@ -160,7 +160,7 @@ export function plan(arg: string | undefined, scenes: Scenes, power: string, col
   if (value) return on(sceneCmds(value));
 
   const close = Object.keys(colours).filter((c) => c.startsWith(arg.slice(0, 2).toLowerCase()));
-  const hint = close.length ? ` — did you mean ${close.join(", ")}?` : " — try: lamp --help";
+  const hint = close.length ? `. Did you mean ${close.join(", ")}?` : ". Try: lamp --help";
   throw new Error(`don't understand "${arg}"${hint}`);
 }
 
@@ -169,7 +169,7 @@ export function buildScene(words: string[], colours: Colours = NAMED_COLOURS): S
   const scene: Scene = {};
   for (const word of words) {
     const value = parseValue(word, colours);
-    if (!value) throw new Error(`don't understand "${word}" — expected a brightness, a temperature like 2700k, or a colour`);
+    if (!value) throw new Error(`don't understand "${word}". Expected a brightness, a temperature like 2700k, or a colour`);
     // Colour and temperature are the same dimension on this lamp, so the last
     // one named wins rather than both being stored.
     if (value.kelvin !== undefined) delete scene.rgb;
@@ -192,7 +192,7 @@ export function sceneToToml(name: string, scene: Scene): string {
 
 /**
  * Replace, add or (with a null scene) remove one scene in the config text,
- * leaving every other line — comments included — exactly as it was.
+ * leaving every other line, comments included, exactly as it was.
  *
  * A section runs until the next "[", which is true for scenes because their
  * values are only numbers and strings. It would not hold for a section
@@ -225,7 +225,7 @@ async function loadConfig(requireToken = true): Promise<Loaded> {
     // A token left behind in the config file is the likeliest reason to land
     // here, and silently ignoring it would look like the lamp was broken.
     const stale = cfg.token
-      ? `\n${CONFIG_PATH} still has a 'token' line. It is no longer read — move it and delete the line.`
+      ? `\n${CONFIG_PATH} still has a 'token' line. It is no longer read. Move it and delete the line.`
       : "";
     throw new Error(`$${TOKEN_ENV} is not set.\nRun 'lamp setup', or add it to ~/.zsh_secrets.${stale}`);
   }
@@ -272,7 +272,7 @@ function listScenes(cfg: Loaded): void {
 /**
  * Save, overwrite or remove a scene.
  *
- * With no values, the lamp's current state is captured — which is the point:
+ * With no values, the lamp's current state is captured, which is the point:
  * the values worth saving are the ones you arrived at by eye, not ones guessed
  * in a text editor.
  */
@@ -375,7 +375,7 @@ if (import.meta.main) {
   main().catch((err) => {
     // An unreachable lamp is a normal condition (lamp off at the wall, not
     // home), not something worth a stack trace.
-    console.error(err instanceof LampUnreachable ? `lamp: unreachable — ${err.message}` : `lamp: ${err.message}`);
+    console.error(err instanceof LampUnreachable ? `lamp: unreachable, ${err.message}` : `lamp: ${err.message}`);
     process.exit(1);
   });
 }

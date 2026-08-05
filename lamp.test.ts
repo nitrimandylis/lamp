@@ -84,7 +84,7 @@ test("a near miss suggests the colours it could have meant", () => {
   expect(() => plan("blu", scenes, "on")).toThrow(/blue/);
 });
 
-const CONFIG = `# lamp — keep this comment
+const CONFIG = `# lamp: keep this comment
 ip = "192.168.1.4"
 
 [scenes.read]
@@ -114,7 +114,7 @@ test("a scene must say something", () => {
 
 test("adding a scene leaves every other line, comments included, untouched", () => {
   const out = upsertScene(CONFIG, "focus", { brightness: 60, kelvin: 5000 });
-  expect(out).toContain("# lamp — keep this comment");
+  expect(out).toContain("# lamp: keep this comment");
   expect(out).toContain('ip = "192.168.1.4"');
   expect(out).toContain("[scenes.read]");
   expect(out).toContain("[scenes.sleep]");
