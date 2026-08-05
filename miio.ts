@@ -1,5 +1,11 @@
 // The miIO protocol, as spoken by Xiaomi devices on udp/54321.
 //
+// Protocol reference: rytilahti/python-miio (GPL-3.0), the canonical
+// implementation and the reason any of this is documented at all. `miiocli` is
+// also what first proved this lamp answers on udp/54321. Written here from the
+// protocol description rather than translated from that source, which is why
+// this file can be MIT.
+//
 // A packet is a 32-byte header followed by an AES-128-CBC encrypted JSON body.
 // The header is: magic(2) length(2) unknown(4) deviceId(4) stamp(4) checksum(16).
 // The checksum is md5 over the header with the raw token sitting in the checksum

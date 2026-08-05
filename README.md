@@ -100,6 +100,12 @@ There is no scheduling, no sunrise, no dim-at-11pm. A reconciler on a 30-second 
 
 **Stack:** bun · typescript · node:dgram · node:crypto · zero runtime dependencies
 
+## 🙇 Credits
+
+[rytilahti/python-miio](https://github.com/rytilahti/python-miio) (GPL-3.0) is the reason miIO is documented at all. It is the canonical implementation of everything in `miio.ts`: the packet layout, the md5-derived key and iv, the handshake, the stamp. `miiocli` is also what first proved this lamp answered on udp/54321, before a line of this existed. Nothing here is translated from its source, which is what lets this repo be MIT, but the protocol knowledge is entirely theirs.
+
+[PiotrMachowski/Xiaomi-cloud-tokens-extractor](https://github.com/PiotrMachowski/Xiaomi-cloud-tokens-extractor) (MIT) is where `cloud.ts` comes from, ported rather than referenced: the RC4-drop-1024, the signature scheme, the captcha and 2fa flows. Its output values are frozen as test fixtures so the port cannot drift without a test going red.
+
 ---
 
 <div align="center">

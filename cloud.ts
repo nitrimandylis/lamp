@@ -1,6 +1,8 @@
 // One-time token retrieval from the Xiaomi cloud, by username and password.
 //
-// Ported from PiotrMachowski/Xiaomi-cloud-tokens-extractor (MIT).
+// Ported from PiotrMachowski/Xiaomi-cloud-tokens-extractor (MIT), which is
+// itself the maintained answer to the token problem that rytilahti/python-miio
+// exposes through `miiocli cloud`.
 //
 // The naive password login — the one `miiocli cloud` uses — fails with "Access
 // denied" on any account that has a captcha or two-factor verification on it,
