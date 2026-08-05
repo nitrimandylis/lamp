@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { plan, hexToInt, NAMED_COLOURS, type Scenes } from "./lamp";
+import { plan, hexToInt, buildScene, upsertScene, NAMED_COLOURS, type Scenes } from "./lamp";
 import { buildPacket, parsePacket } from "./miio";
 
 const scenes: Scenes = {
@@ -82,6 +82,76 @@ test("a six-letter hex word is read as hex, not shadowed by a config colour", ()
 
 test("a near miss suggests the colours it could have meant", () => {
   expect(() => plan("blu", scenes, "on")).toThrow(/blue/);
+});
+
+const CONFIG = `# lamp — keep this comment
+ip = "192.168.1.4"
+
+[scenes.read]
+brightness = 80
+kelvin = 4000
+
+[scenes.sleep]
+brightness = 5
+rgb = "#ff3000"
+`;
+
+test("scene values merge across words", () => {
+  expect(buildScene(["80", "4000k"])).toEqual({ brightness: 80, kelvin: 4000 });
+  expect(buildScene(["60", "red"])).toEqual({ brightness: 60, rgb: "#ff0000" });
+  expect(buildScene(["warm"])).toEqual({ kelvin: 2700 });
+});
+
+test("colour and temperature are one dimension, so the last one named wins", () => {
+  expect(buildScene(["80", "red", "2700k"])).toEqual({ brightness: 80, kelvin: 2700 });
+  expect(buildScene(["80", "2700k", "red"])).toEqual({ brightness: 80, rgb: "#ff0000" });
+});
+
+test("a scene must say something", () => {
+  expect(() => buildScene([])).toThrow();
+  expect(() => buildScene(["nonsense"])).toThrow(/nonsense/);
+});
+
+test("adding a scene leaves every other line, comments included, untouched", () => {
+  const out = upsertScene(CONFIG, "focus", { brightness: 60, kelvin: 5000 });
+  expect(out).toContain("# lamp — keep this comment");
+  expect(out).toContain('ip = "192.168.1.4"');
+  expect(out).toContain("[scenes.read]");
+  expect(out).toContain("[scenes.sleep]");
+  expect(out).toContain("[scenes.focus]\nbrightness = 60\nkelvin = 5000\n");
+});
+
+test("overwriting a scene replaces it rather than duplicating it", () => {
+  const out = upsertScene(CONFIG, "read", { brightness: 90, rgb: "#ffffff" });
+  expect(out.match(/\[scenes\.read\]/g)).toHaveLength(1);
+  expect(out).toContain('rgb = "#ffffff"');
+  expect(out).not.toContain("kelvin = 4000");
+  // The scene that was not touched must survive intact.
+  expect(out).toContain("[scenes.sleep]\nbrightness = 5\nrgb = \"#ff3000\"");
+});
+
+test("removing a scene removes only that scene", () => {
+  const out = upsertScene(CONFIG, "read", null);
+  expect(out).not.toContain("[scenes.read]");
+  expect(out).toContain("[scenes.sleep]");
+  expect(out).toContain('ip = "192.168.1.4"');
+});
+
+test("a rewritten config still parses back to the same scenes", async () => {
+  const out = upsertScene(CONFIG, "focus", { brightness: 60, kelvin: 5000 });
+  const path = `${process.env.TMPDIR ?? "/tmp"}/lamp-test-${Date.now()}.toml`;
+  await Bun.write(path, out);
+  const parsed = (await import(path)).default;
+  expect(Object.keys(parsed.scenes).sort()).toEqual(["focus", "read", "sleep"]);
+  expect(parsed.scenes.focus).toEqual({ brightness: 60, kelvin: 5000 });
+  expect(parsed.scenes.read).toEqual({ brightness: 80, kelvin: 4000 });
+  expect(parsed.ip).toBe("192.168.1.4");
+});
+
+test("scene names that would corrupt the file are rejected", () => {
+  expect(() => upsertScene(CONFIG, "my scene", { brightness: 10 })).toThrow();
+  expect(() => upsertScene(CONFIG, "a]b", { brightness: 10 })).toThrow();
+  expect(() => upsertScene(CONFIG, "night-2", { brightness: 10 })).not.toThrow();
 });
 
 test("a packet survives a build/parse round trip", () => {

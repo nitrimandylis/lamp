@@ -24,6 +24,32 @@ lamp @read      # a scene from your config
 lamp status     # on  80%  4000K
 ```
 
+## Scenes
+
+Set the lamp by eye until it looks right, then name it:
+
+```bash
+lamp 42 && lamp teal
+lamp scene desk          # Saved @desk:  42%  #00ccaa
+lamp @desk               # and back to it any time
+```
+
+Or state the values outright:
+
+```bash
+lamp scene evening 40 2200k
+lamp scene alarm 100 red
+lamp scenes              # list them
+lamp scene rm alarm      # delete one
+```
+
+Capturing beats typing here: the values worth keeping are the ones you arrived
+at by looking at the lamp, not ones guessed in a text editor.
+
+Scenes live in `config.toml`, and editing is surgical — comments, ordering and
+every other section survive untouched. Colour and temperature are one dimension
+on this lamp, so if a scene names both, the last one wins.
+
 No cloud round trip, no hub, no Xiaomi or Yeelight app in the loop. The lamp's
 HomeKit pairing is untouched, so the Home app keeps working on your phone
 exactly as before.

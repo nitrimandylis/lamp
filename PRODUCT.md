@@ -25,11 +25,13 @@ exactly as it did before, and nothing had to be factory reset.
 ## Shape
 
 - One argument, one intent: `lamp 20`, `lamp 2700k`, `lamp @read`.
+- Scenes are captured from the lamp, not typed: `lamp scene desk` saves what you
+  are looking at. Explicit values are there too, but they are the fallback, not
+  the main path — the values worth keeping are ones arrived at by eye.
 - Scenes are namespaced behind `@` so they can never collide with a built-in.
 - Colour temperature requires a `k` suffix, so `20` and `2700` can't be confused.
 - Setting brightness or colour on a lamp that is off also turns it on. Typing a
   command is an unambiguous statement of intent.
-
 - Named colours are tuned for an LED rather than a screen, and every one is
   overridable in config. Hardware never matches the ideal on paper, so the
   calibration knob stays.

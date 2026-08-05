@@ -51,6 +51,37 @@ Apply a named scene from the configuration file.
 .TP
 .B status
 Print power, brightness, and current colour or temperature.
+.SH SCENES
+A scene is a named brightness together with a colour or a temperature, stored in
+the configuration file and applied with
+.BI @ name \fR.\fP
+.TP
+.B scene \fIname\fR
+Save the lamp's current state under
+.IR name ,
+overwriting it if it exists. This is the usual way to make one: set the lamp by
+eye until it looks right, then name it.
+.TP
+.B scene \fIname\fR \fIvalue\fR...
+Save explicit values instead, for example
+.B lamp scene evening 40 2200k
+or
+.BR "lamp scene alarm 100 red" .
+Each value is one of the arguments above: a brightness, a temperature, or a
+colour. Colour and temperature are the same dimension on this lamp, so if both
+are given the last one wins.
+.TP
+.B scene rm \fIname\fR
+Delete a scene. A scene may still be named
+.BR rm ,
+since deletion requires a name after it.
+.TP
+.B scenes
+List the scenes and what each one sets.
+.PP
+Editing is surgical: comments, ordering and every other section of the
+configuration file are left exactly as they were.
+.SH SETUP
 .TP
 .B setup
 Sign in to the Xiaomi cloud, write the device address to the configuration
