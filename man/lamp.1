@@ -1,0 +1,73 @@
+.TH LAMP 1 "2026-08-05" "lamp 0.1.0" "User Commands"
+.SH NAME
+lamp \- control the Mi Bedside Lamp 2 over the local network
+.SH SYNOPSIS
+.B lamp
+[\fIargument\fR]
+.SH DESCRIPTION
+Controls a Mi Bedside Lamp 2 (MJCTD02YL) directly over the miIO protocol on
+udp/54321. Everything happens on the local network: there is no cloud round
+trip, no hub, and no dependency on the Xiaomi or Yeelight apps. The lamp's
+HomeKit pairing is untouched, so the Home app keeps working alongside it.
+.PP
+Setting a brightness or colour on a lamp that is off will also turn it on.
+.SH ARGUMENTS
+.TP
+.B (none)
+Toggle power.
+.TP
+.BR on ", " off
+Set power directly.
+.TP
+.B <0-100>
+Set brightness as a percentage. A value of 0 turns the lamp off.
+.TP
+.BI <n> k
+Set colour temperature in kelvin, for example
+.BR "lamp 2700k" .
+Values are clamped to the 1700\-6500K the device accepts. The
+.B k
+suffix is required, so that brightness and temperature cannot be confused.
+.TP
+.BR warm ", " cool
+Shorthand for 2700k and 5000k.
+.TP
+.BI # rrggbb
+Set colour. The leading hash is optional.
+.TP
+.BI @ scene
+Apply a named scene from the configuration file.
+.TP
+.B status
+Print power, brightness, and current colour or temperature.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show help.
+.SH FILES
+.TP
+.I ~/.config/lamp/config.toml
+Device address, token, and scene definitions. Contains a device credential and
+should be mode 600.
+.SH CONFIGURATION
+.EX
+ip = "192.168.1.4"
+token = "0123456789abcdef0123456789abcdef"
+
+[scenes.read]
+brightness = 80
+kelvin = 4000
+
+[scenes.sleep]
+brightness = 5
+rgb = "#ff3000"
+.EE
+.PP
+The token is a 32 character hex string, obtained once from the Xiaomi cloud
+account the lamp is registered to.
+.SH EXIT STATUS
+Exits non-zero if the configuration is missing or invalid, if the argument is
+not understood, or if the lamp does not answer. A lamp that is switched off at
+the wall is reported as unreachable.
+.SH SEE ALSO
+.BR swatch (1)
