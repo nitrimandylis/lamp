@@ -1,6 +1,6 @@
 ---
 name: lamp-cli
-description: Control a Mi Bedside Lamp 2 from the terminal with the `lamp` CLI — turn the lamp or light on and off, dim it, set brightness, set a colour or colour temperature, make it warm or cool, and save or apply named scenes. Use whenever the user asks to change, dim, brighten, colour or check their lamp, bedside lamp, or bedroom light, mentions `lamp`, or wants a lighting scene saved or recalled.
+description: Control a Mi Bedside Lamp 2 from the terminal with the `lamp` CLI. Turn the lamp or light on and off, dim it, set brightness, set a colour or colour temperature, make it warm or cool, and save or apply named scenes. Use whenever the user asks to change, dim, brighten, colour or check their lamp, bedside lamp, or bedroom light, mentions `lamp`, or wants a lighting scene saved or recalled.
 ---
 
 # lamp
@@ -12,7 +12,7 @@ cloud service involved.
 ## Setup
 
 Requires `$LAMP_TOKEN`, a 32-character hex device credential, exported in the
-user's shell. **Never read, print, or echo this value** — not to test it, not to
+user's shell. **Never read, print, or echo this value.** Not to test it, not to
 confirm it is set. To check whether it is set, run a real command like
 `lamp status` and read the error.
 
@@ -40,7 +40,7 @@ All of these are non-interactive and return immediately.
 | `lamp scene <name>` | Save the lamp's *current* state as a scene |
 
 Setting a brightness or colour on a lamp that is off also turns it on, so
-`lamp red` is enough — no need to send `lamp on` first.
+`lamp red` is enough, with no need to send `lamp on` first.
 
 ## Commands you must NOT run
 
@@ -69,7 +69,7 @@ overwriting or deleting one they did not explicitly name.
   up to 6 seconds while the radio wakes (three 2-second attempts). This is
   normal, not a fault. Do not add your own retry loop on top.
 - **`$LAMP_TOKEN` must be exported.** A bare `LAMP_TOKEN=...` line in a shell
-  file is a shell variable, and `lamp` — a child process — never sees it. This
+  file is a shell variable, and `lamp`, a child process, never sees it. This
   presents as "$LAMP_TOKEN is not set" even though the user can see the
   variable in their own shell.
 - **Colour temperature needs the `k` suffix.** `lamp 2700` is an error, not

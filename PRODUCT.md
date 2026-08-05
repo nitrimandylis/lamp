@@ -27,7 +27,7 @@ exactly as it did before, and nothing had to be factory reset.
 - One argument, one intent: `lamp 20`, `lamp 2700k`, `lamp @read`.
 - Scenes are captured from the lamp, not typed: `lamp scene desk` saves what you
   are looking at. Explicit values are there too, but they are the fallback, not
-  the main path — the values worth keeping are ones arrived at by eye.
+  the main path. The values worth keeping are ones arrived at by eye.
 - Scenes are namespaced behind `@` so they can never collide with a built-in.
 - Colour temperature requires a `k` suffix, so `20` and `2700` can't be confused.
 - Setting brightness or colour on a lamp that is off also turns it on. Typing a
@@ -35,6 +35,9 @@ exactly as it did before, and nothing had to be factory reset.
 - Named colours are tuned for an LED rather than a screen, and every one is
   overridable in config. Hardware never matches the ideal on paper, so the
   calibration knob stays.
+- An agent skill ships in `lamp-cli/`, installed by `bun run compile`. Its real
+  payload is the split between commands safe to run unattended and `lamp setup`,
+  which reads a password in raw mode and hangs a tool call.
 - The device token lives in `$LAMP_TOKEN`, never in a file. That split is the
   point: `config.toml` then contains nothing secret, so it can be read, synced
   and committed freely, and there is no file whose permissions have to be right
@@ -47,11 +50,11 @@ brightness, dimming while audio played, colour following the active swatch
 theme. It worked, and it was removed.
 
 The reason is that a lamp is not a system that benefits from converging on a
-desired state. Every rule needed a guard to stop it feeling haunted — never
+desired state. Every rule needed a guard to stop it feeling haunted: never
 power on, hold off for two hours after a manual command, hand back control on
-`lamp off` — and the guards existed entirely to make automation stop doing
-things. When the guards are the interesting part, the feature is arguing with
-its user. Typing `lamp red` is already fast.
+`lamp off`. The guards existed entirely to make automation stop doing things.
+When the guards are the interesting part, the feature is arguing with its user.
+Typing `lamp red` is already fast.
 
 What the attempt did establish, for anyone tempted again:
 

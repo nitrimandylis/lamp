@@ -46,7 +46,7 @@ lamp scene rm alarm      # delete one
 Capturing beats typing here: the values worth keeping are the ones you arrived
 at by looking at the lamp, not ones guessed in a text editor.
 
-Scenes live in `config.toml`, and editing is surgical — comments, ordering and
+Scenes live in `config.toml`, and editing is surgical. Comments, ordering and
 every other section survive untouched. Colour and temperature are one dimension
 on this lamp, so if a scene names both, the last one wins.
 
@@ -59,10 +59,23 @@ exactly as before.
 ```bash
 git clone https://github.com/nitrimandylis/lamp.git
 cd lamp
-bun run compile   # → ~/.bun/bin/lamp, and man lamp into your manpath
+bun run compile   # → ~/.bun/bin/lamp, man lamp, and the agent skill
 lamp --help
 man lamp          # full reference, offline
 ```
+
+## Driving it from an agent
+
+`lamp-cli/SKILL.md` is the agent-facing doc, installed by `bun run compile` if
+you have a `~/.claude/skills` directory. It covers what `--help` has no room
+for: that every command except `lamp setup` is safe to run unattended, and that
+`setup` is not, because it reads a password in raw mode and will hang a tool
+call waiting for input that never comes.
+
+It also carries the traps worth knowing before breaking something: that a
+timeout means an unreachable lamp *or* a wrong token and cannot tell you which,
+that `lamp scene rm` deletes without asking, and that the automation the tool
+deliberately does not have should not be reimplemented with `cron`.
 
 ## Setting it up
 
@@ -74,8 +87,8 @@ Asks for your Xiaomi account and password, answers the captcha and emailed
 two-factor code if the account demands them, writes the device address to
 `~/.config/lamp/config.toml`, and puts the device token on your clipboard.
 
-Handling both challenges is the whole point. The naive password login — the one
-`miiocli cloud` performs — returns `Access denied` on any account with
+Handling both challenges is the whole point. The naive password login, the one
+`miiocli cloud` performs, returns `Access denied` on any account with
 verification enabled, which is most of them.
 
 The token goes in the environment, never in a file:
@@ -122,14 +135,16 @@ flowchart LR
   E --> F["Mi Bedside Lamp 2"]
 ```
 
-A miIO packet is a 32-byte header — magic, length, device id, the device's own
-clock, and an md5 checksum — wrapped around an encrypted JSON body. The first
+A miIO packet is a 32-byte header (magic, length, device id, the device's own
+clock, and an md5 checksum) wrapped around an encrypted JSON body. The first
 datagram is a handshake that asks the lamp for its id and clock; everything
 after that is a `set_bright` / `set_ct_abx` / `set_rgb` call.
 
-Argument parsing is a pure function, `plan()`, which turns one argument into the
-list of calls that carry it out. That is where the whole command vocabulary
-lives and it is tested without a lamp on the network.
+Argument parsing is two pure functions. `parseValue()` is the single definition
+of what `80`, `2700k`, `warm` and `red` mean, and `plan()` turns one argument
+into the list of calls that carry it out. Scene building reuses `parseValue()`,
+so `lamp red` and `lamp scene x red` can never disagree about what red is. Both
+are tested without a lamp on the network.
 
 ## Why not the Yeelight LAN protocol
 
