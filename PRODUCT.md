@@ -30,27 +30,46 @@ exactly as it did before, and nothing had to be factory reset.
 - Setting brightness or colour on a lamp that is off also turns it on. Typing a
   command is an unambiguous statement of intent.
 
-## Where it's headed
+## The reactive layer
 
-**v2, the reactive layer.** A single `lamp tick` reconciler on a 30s launchd
-interval — not a daemon, not a set of calendar jobs. Rules divide by dimension
-rather than by priority, so all three coexist instead of shadowing each other:
+A single `lamp tick` reconciler on a 30s launch agent — not a daemon, not a set
+of calendar jobs. Three inputs, decided in one pure function (`resolve()` in
+`rules.ts`) that needs no hardware to test:
 
-- **swatch owns colour.** `lamp` reads swatch's existing state; swatch is never
-  modified. The dependency points this way on purpose.
-- **Time of day owns the brightness baseline and warmth.**
-- **Media (Cider on :10767) overrides brightness downward** while playing.
+- **Time of day** sets the brightness baseline.
+- **Media** caps brightness while audio plays. Only ever dims.
+- **Theme** supplies the colour, read out of swatch's own files.
 
-Two rules keep it from feeling haunted:
+### The one thing the design got wrong
+
+"Colour and brightness are separate dimensions, so they can't fight" is only
+half true: the lamp has a single colour *mode*, so a kelvin and an RGB value
+cannot both apply. The schedule breaks the tie — a slot that names a `kelvin`
+claims the colour dimension, a slot without one lets the theme accent through.
+That is a better answer than a priority order would have given, because it is
+what actually wanted expressing: theme colour by day, warm by night.
+
+### Guards
 
 - The reconciler **never turns the lamp on**, only adjusts one already on. It
-  cannot switch itself on in an empty room, and an unreachable lamp is a silent
-  no-op rather than an error.
-- A manual command **pins the state** until `lamp off` or two hours pass, so
+  cannot light an empty room, and an unreachable lamp is a silent no-op.
+- A manual command **pins the state** for two hours or until `lamp off`, so
   automation can never stomp a deliberate action.
+- Only the difference is sent, so a steady state is completely silent on the
+  wire.
 
-Precedence lives in one pure function, testable without hardware, the same way
-`plan()` is now.
+### Detecting media
+
+Not Cider's API. The `coreaudiod` power assertion covers Cider, Music.app,
+`jazz` and the browser at once, needs no application token, and cannot be
+broken by Cider changing its API. A short system sound could in principle
+trigger a dim, but with a 30 second tick the odds of sampling one are slight
+and the cost is a brief dim.
+
+## Where it's headed
+
+Nothing planned. The remaining known softness is that `lamp setup` is only
+exercised by its unit tests and one live login.
 
 ## Not doing
 

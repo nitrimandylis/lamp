@@ -55,7 +55,7 @@ export function parsePacket(packet: Buffer, token: Buffer): { deviceId: number; 
   return { deviceId, stamp, body: decrypt(body, token).toString("utf8").replace(/\0+$/, "") };
 }
 
-function send(ip: string, packet: Buffer, timeoutMs: number): Promise<Buffer> {
+function sendOnce(ip: string, packet: Buffer, timeoutMs: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const sock = createSocket("udp4");
     const timer = setTimeout(() => {
@@ -76,6 +76,24 @@ function send(ip: string, packet: Buffer, timeoutMs: number): Promise<Buffer> {
   });
 }
 
+/**
+ * UDP has no retransmission, and the lamp's Wi-Fi sleeps between commands: the
+ * first datagram after an idle spell often goes unanswered while the radio
+ * wakes, and a single-shot send reports that as an unreachable lamp. Retrying
+ * here covers every caller at once.
+ */
+async function send(ip: string, packet: Buffer, timeoutMs: number, attempts = 3): Promise<Buffer> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await sendOnce(ip, packet, timeoutMs);
+    } catch (err) {
+      last = err;
+    }
+  }
+  throw last;
+}
+
 export class Device {
   private deviceId = 0;
   private stamp = 0;
@@ -84,7 +102,9 @@ export class Device {
   private stampReadAt = 0;
   private nextId = 1;
 
-  constructor(private ip: string, private token: Buffer, private timeoutMs = 3000) {}
+  // Every method is an absolute set (set_bright, set_power on/off), never a
+  // relative one, so a retried command is safe to apply twice.
+  constructor(private ip: string, private token: Buffer, private timeoutMs = 2000) {}
 
   async handshake(): Promise<void> {
     const reply = await send(this.ip, HELLO, this.timeoutMs);
