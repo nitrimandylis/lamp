@@ -45,16 +45,26 @@ lamp setup
 ```
 
 Asks for your Xiaomi account and password, answers the captcha and emailed
-two-factor code if the account demands them, then writes the device address and
-token to `~/.config/lamp/config.toml` at mode 600. The password is not echoed
-and never touches disk.
+two-factor code if the account demands them, writes the device address to
+`~/.config/lamp/config.toml`, and puts the device token on your clipboard.
 
 Handling both challenges is the whole point. The naive password login — the one
 `miiocli cloud` performs — returns `Access denied` on any account with
 verification enabled, which is most of them.
 
-The token is a per-device credential. Once written you never need it again
-unless the lamp is factory reset.
+The token goes in the environment, never in a file:
+
+```bash
+echo 'export LAMP_TOKEN=<paste>' >> ~/.zsh_secrets
+```
+
+Pick a file your shell exports but your dotfiles repo does **not** track. The
+`export` matters: a bare `LAMP_TOKEN=...` is a shell variable, and child
+processes never see it.
+
+Keeping it out of the config file means `config.toml` holds nothing secret, so
+it can be read, synced and committed without care. Neither the password nor the
+token is ever written to disk by `lamp`.
 
 ## Colours
 

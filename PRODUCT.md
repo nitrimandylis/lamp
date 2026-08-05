@@ -33,6 +33,10 @@ exactly as it did before, and nothing had to be factory reset.
 - Named colours are tuned for an LED rather than a screen, and every one is
   overridable in config. Hardware never matches the ideal on paper, so the
   calibration knob stays.
+- The device token lives in `$LAMP_TOKEN`, never in a file. That split is the
+  point: `config.toml` then contains nothing secret, so it can be read, synced
+  and committed freely, and there is no file whose permissions have to be right
+  for the tool to be safe.
 
 ## Deliberately not automated
 

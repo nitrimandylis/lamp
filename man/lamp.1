@@ -53,24 +53,35 @@ Apply a named scene from the configuration file.
 Print power, brightness, and current colour or temperature.
 .TP
 .B setup
-Sign in to the Xiaomi cloud and write the device address and token to the
-configuration file. Interactive: it asks for the account and password, and
-handles the captcha and emailed two-factor code that the account may require.
-The password is not echoed and is never written to disk. Needed once, and again
-only if the lamp is reset.
+Sign in to the Xiaomi cloud, write the device address to the configuration
+file, and put the device token on the clipboard to be added to the environment.
+Interactive: it asks for the account and password, and handles the captcha and
+emailed two-factor code that the account may require. The password is not
+echoed, and neither it nor the token is ever written to a file. Needed once, and
+again only if the lamp is reset.
 .SH OPTIONS
 .TP
 .BR \-h ", " \-\-help
 Show help.
+.SH ENVIRONMENT
+.TP
+.B LAMP_TOKEN
+The 32 character hex device token. Required. It is kept out of the
+configuration file so that the file stays safe to read, sync and commit; put it
+somewhere your shell exports but your dotfiles repository does not track, such
+as
+.IR ~/.zsh_secrets .
+.PP
+It must be exported. A bare
+.B LAMP_TOKEN=...
+assignment is a shell variable only, and child processes never see it.
 .SH FILES
 .TP
 .I ~/.config/lamp/config.toml
-Device address, token, scenes, and colour overrides. Contains a device
-credential and should be mode 600.
+Device address, scenes, and colour overrides. No credentials.
 .SH CONFIGURATION
 .EX
 ip = "192.168.1.4"
-token = "0123456789abcdef0123456789abcdef"
 
 [scenes.read]
 brightness = 80
@@ -84,8 +95,6 @@ rgb = "#ff3000"
 blue = "#0033cc"
 .EE
 .PP
-The token is a 32 character hex string, written by
-.BR "lamp setup" .
 Colour overrides are applied one at a time over the built-in names, so setting
 one does not remove the others.
 .SH EXIT STATUS

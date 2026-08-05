@@ -8,6 +8,9 @@ import { Device, LampUnreachable } from "./miio";
 import { passwordLogin, devicesOn, ask, SERVERS, type CloudDevice } from "./cloud";
 
 const CONFIG_PATH = join(homedir(), ".config", "lamp", "config.toml");
+// The device token is a credential, so it lives in the environment rather than
+// in a config file that is easy to commit by accident.
+const TOKEN_ENV = "LAMP_TOKEN";
 
 // The lamp's own limits. Kelvin outside this range is rejected by the device,
 // and set_rgb treats 0 as an error rather than as black.
@@ -33,6 +36,7 @@ Colours:
   red orange amber yellow lime green mint teal cyan
   azure blue indigo violet purple magenta pink white
 
+Token:  $LAMP_TOKEN (put it in ~/.zsh_secrets, not in the config file)
 Config: ~/.config/lamp/config.toml
 `;
 
@@ -151,11 +155,21 @@ async function loadConfig(): Promise<Loaded> {
     throw new Error(`cannot read ${CONFIG_PATH}\nRun 'lamp setup' to create it.`);
   }
   if (!cfg.ip) throw new Error(`${CONFIG_PATH}: missing 'ip'`);
-  if (!cfg.token) throw new Error(`${CONFIG_PATH}: missing 'token' — run 'lamp setup'`);
-  if (!/^[0-9a-f]{32}$/i.test(cfg.token)) throw new Error(`${CONFIG_PATH}: 'token' must be 32 hex characters`);
+
+  const token = process.env[TOKEN_ENV];
+  if (!token) {
+    // A token left behind in the config file is the likeliest reason to land
+    // here, and silently ignoring it would look like the lamp was broken.
+    const stale = cfg.token
+      ? `\n${CONFIG_PATH} still has a 'token' line. It is no longer read — move it and delete the line.`
+      : "";
+    throw new Error(`$${TOKEN_ENV} is not set.\nRun 'lamp setup', or add it to ~/.zsh_secrets.${stale}`);
+  }
+  if (!/^[0-9a-f]{32}$/i.test(token)) throw new Error(`$${TOKEN_ENV} must be 32 hex characters`);
+
   return {
     ip: cfg.ip,
-    token: cfg.token,
+    token,
     scenes: cfg.scenes ?? {},
     // Config entries override the built-ins one at a time, so tuning "blue"
     // does not mean re-listing every other colour. Both spellings accepted.
@@ -195,14 +209,22 @@ async function setup(): Promise<void> {
   const chosen = devices[Number(answer) - 1];
   if (!chosen) throw new Error(`no device ${answer}`);
 
-  // Keep any scenes the user already wrote; only the credentials are replaced.
+  // Only the address goes to disk. Keep any scenes and colours already written,
+  // and strip a token line left over from an older version.
   const existing = existsSync(CONFIG_PATH) ? readFileSync(CONFIG_PATH, "utf8") : "";
   const rest = existing.replace(/^\s*(ip|token)\s*=.*$/gm, "").replace(/^#.*$/gm, "").trimStart();
   mkdirSync(dirname(CONFIG_PATH), { recursive: true });
-  writeFileSync(CONFIG_PATH, `ip = "${chosen.ip}"\ntoken = "${chosen.token}"\n\n${rest}`);
+  writeFileSync(CONFIG_PATH, `ip = "${chosen.ip}"\n\n${rest}`);
   chmodSync(CONFIG_PATH, 0o600);
+  console.log(`\nWrote the address to ${CONFIG_PATH}.`);
 
-  console.log(`\nWrote ${CONFIG_PATH} (mode 600). Try: lamp status`);
+  // The token is a credential and is deliberately never written to a file. It
+  // goes to the clipboard so it does not sit in terminal scrollback either.
+  const copied = Bun.spawnSync(["pbcopy"], { stdin: Buffer.from(chosen.token) }).success;
+  console.log(`\nThe device token is ${copied ? "on your clipboard" : `: ${chosen.token}`}.`);
+  console.log(`Add it to your shell, then start a new shell:\n`);
+  console.log(`  echo 'export ${TOKEN_ENV}=<paste>' >> ~/.zsh_secrets\n`);
+  console.log("Then: lamp status");
   process.exit(0);
 }
 
