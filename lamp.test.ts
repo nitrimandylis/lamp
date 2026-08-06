@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { plan, hexToInt, buildScene, upsertScene, NAMED_COLOURS, type Scenes } from "./lamp";
+import { plan, hexToInt, buildScene, upsertScene, sceneJson, NAMED_COLOURS, type Scenes } from "./lamp";
 import { buildPacket, parsePacket } from "./miio";
 
 const scenes: Scenes = {
@@ -168,4 +168,19 @@ test("the checksum covers the body, so tampering is detectable", () => {
   const a = buildPacket(1, 1, token, '{"id":1}');
   const b = buildPacket(1, 1, token, '{"id":2}');
   expect(a.subarray(16, 32).equals(b.subarray(16, 32))).toBe(false);
+});
+
+test("scene JSON keeps every key, nulling what the scene does not set", () => {
+  expect(sceneJson("read", scenes.read!)).toEqual({
+    name: "read",
+    brightness: 80,
+    kelvin: 4000,
+    rgb: null,
+  });
+  expect(sceneJson("sleep", scenes.sleep!)).toEqual({
+    name: "sleep",
+    brightness: 5,
+    kelvin: null,
+    rgb: "#ff3000",
+  });
 });

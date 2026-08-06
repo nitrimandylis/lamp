@@ -28,6 +28,7 @@ All of these are non-interactive and return immediately.
 | Command | Effect |
 | --- | --- |
 | `lamp status` | `on  80%  4000K` or `on  80%  #ff1f6b` |
+| `lamp status --json` | `{power, brightness, mode, kelvin, rgb}` — parse this rather than the line above |
 | `lamp on` / `lamp off` | Set power. Idempotent. |
 | `lamp <0-100>` | Brightness. `lamp 0` turns it off. |
 | `lamp <n>k` | Colour temperature, 1700–6500K, e.g. `lamp 2700k` |
@@ -36,6 +37,7 @@ All of these are non-interactive and return immediately.
 | `lamp #rrggbb` | Colour by hex |
 | `lamp @<scene>` | Apply a saved scene |
 | `lamp scenes` | List scenes and what each sets |
+| `lamp scenes --json` | `[{name, brightness, kelvin, rgb}]`, empty array if none |
 | `lamp scene <name> <values>` | Save a scene from explicit values |
 | `lamp scene <name>` | Save the lamp's *current* state as a scene |
 
@@ -82,6 +84,12 @@ overwriting or deleting one they did not explicitly name.
 - **`lamp scene <name>` with no values reads the lamp**, so it needs
   `$LAMP_TOKEN` and a reachable lamp. With values it does not.
 - **Scene names** accept only letters, digits, dashes and underscores.
+- **`--json` is reads only.** `status` and `scenes` take it; every other command
+  is an action and signals through its exit code. Passing `--json` to an action
+  is accepted and ignored, so a zero exit with no output is success, not a
+  silent failure.
+- **`null` in JSON is meaningful, not missing.** `kelvin: null` on a status
+  means the lamp is in colour mode, not that the value could not be read.
 - Applying a scene that does not exist fails and lists the ones that do, so
   `lamp scenes` is rarely needed first.
 

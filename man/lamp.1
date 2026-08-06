@@ -94,6 +94,39 @@ again only if the lamp is reset.
 .TP
 .BR \-h ", " \-\-help
 Show help.
+.TP
+.B \-\-json
+Machine-readable output for
+.B status
+and
+.BR scenes .
+Accepted in any position. See
+.B JSON OUTPUT
+below.
+.SH JSON OUTPUT
+With
+.BR \-\-json ,
+stdout carries exactly one JSON value and nothing else; errors stay on stderr
+with a non-zero exit status, so consumers branch on the exit code rather than
+parsing the error.
+.TP
+.B lamp status \-\-json
+One object:
+.IR power " (\fBon\fR or \fBoff\fR), " brightness " (0\-100), "
+.IR mode " (\fBtemperature\fR or \fBcolour\fR), " kelvin ", " rgb .
+Whichever of
+.I kelvin
+and
+.I rgb
+does not apply to the current mode is
+.BR null .
+.TP
+.B lamp scenes \-\-json
+An array of objects:
+.IR name ", " brightness ", " kelvin ", " rgb .
+A value the scene does not set is
+.BR null ,
+never omitted. An empty array means no scenes are saved.
 .SH ENVIRONMENT
 .TP
 .B LAMP_TOKEN

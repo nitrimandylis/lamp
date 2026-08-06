@@ -30,12 +30,14 @@ Usage:
   lamp #ffb300         set colour by hex
   lamp @<scene>        apply a scene from config.toml
   lamp status          show current state
+  lamp status --json   the same, as one JSON object
 
 Scenes:
   lamp scene <name>            save the lamp's current state as <name>
   lamp scene <name> 80 2700k   save explicit values instead
   lamp scene rm <name>         delete it
   lamp scenes                  list them
+  lamp scenes --json           list them as JSON
 
 Setup:
   lamp setup           fetch the device token from Xiaomi
@@ -227,7 +229,7 @@ async function loadConfig(requireToken = true): Promise<Loaded> {
     const stale = cfg.token
       ? `\n${CONFIG_PATH} still has a 'token' line. It is no longer read. Move it and delete the line.`
       : "";
-    throw new Error(`$${TOKEN_ENV} is not set.\nRun 'lamp setup', or add it to ~/.zsh_secrets.${stale}`);
+    throw new Error(`$${TOKEN_ENV} is not set.\nRun 'lamp setup', or export it from your shell profile.${stale}`);
   }
   if (!/^[0-9a-f]{32}$/i.test(token)) throw new Error(`$${TOKEN_ENV} must be 32 hex characters`);
 
@@ -262,8 +264,21 @@ export function describeScene(scene: Scene): string {
   return parts.join("  ");
 }
 
-function listScenes(cfg: Loaded): void {
+/** One scene as JSON: every field present, absent values null rather than dropped. */
+export function sceneJson(name: string, scene: Scene) {
+  return {
+    name,
+    brightness: scene.brightness ?? null,
+    kelvin: scene.kelvin ?? null,
+    rgb: scene.rgb ?? null,
+  };
+}
+
+function listScenes(cfg: Loaded, json = false): void {
   const names = Object.keys(cfg.scenes);
+  if (json) {
+    return void console.log(JSON.stringify(names.map((n) => sceneJson(n, cfg.scenes[n]!))));
+  }
   if (names.length === 0) return void console.log("No scenes yet. Set the lamp how you like it, then: lamp scene <name>");
   const width = Math.max(...names.map((n) => n.length));
   for (const name of names) console.log(`  @${name.padEnd(width)}  ${describeScene(cfg.scenes[name]!)}`);
@@ -341,29 +356,43 @@ async function setup(): Promise<void> {
   // goes to the clipboard so it does not sit in terminal scrollback either.
   const copied = Bun.spawnSync(["pbcopy"], { stdin: Buffer.from(chosen.token) }).success;
   console.log(`\nThe device token is ${copied ? "on your clipboard" : `: ${chosen.token}`}.`);
-  console.log(`Add it to your shell, then start a new shell:\n`);
-  console.log(`  echo 'export ${TOKEN_ENV}=<paste>' >> ~/.zsh_secrets\n`);
+  console.log(`Add it to your shell profile, then start a new shell:\n`);
+  console.log(`  export ${TOKEN_ENV}=<paste>\n`);
   console.log("Then: lamp status");
   process.exit(0);
 }
 
 async function main() {
-  const arg = process.argv[2];
+  // --json is pulled out before dispatch so it works in any position and can
+  // never be mistaken for a brightness or colour argument by plan().
+  const argv = process.argv.slice(2).filter((a) => a !== "--json");
+  const json = process.argv.includes("--json");
+  const arg = argv[0];
 
   if (arg === "-h" || arg === "--help") return void console.log(HELP);
   if (arg === "setup") return void (await setup());
 
   // Listing and defining scenes are the two things that can work without a
   // token, so they do not demand one.
-  if (arg === "scenes") return void listScenes(await loadConfig(false));
-  if (arg === "scene") return void (await saveScene(await loadConfig(false), process.argv.slice(3)));
+  if (arg === "scenes") return void listScenes(await loadConfig(false), json);
+  if (arg === "scene") return void (await saveScene(await loadConfig(false), argv.slice(1)));
 
   const cfg = await loadConfig();
   const dev = new Device(cfg.ip, Buffer.from(cfg.token, "hex"));
   const current = await readCurrent(dev);
 
   if (arg === "status") {
-    const colour = current.colorMode === "2" ? `${current.kelvin}K` : `#${current.rgb}`;
+    const temperature = current.colorMode === "2";
+    if (json) {
+      return void console.log(JSON.stringify({
+        power: current.power,
+        brightness: current.brightness,
+        mode: temperature ? "temperature" : "colour",
+        kelvin: temperature ? current.kelvin : null,
+        rgb: temperature ? null : `#${current.rgb}`,
+      }));
+    }
+    const colour = temperature ? `${current.kelvin}K` : `#${current.rgb}`;
     return void console.log(`${current.power}  ${current.brightness}%  ${colour}`);
   }
 

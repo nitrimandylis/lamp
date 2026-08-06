@@ -47,7 +47,7 @@ nick@lamp:~$ lamp 20 && lamp warm
 | 04 | **`lamp red`** | 17 named colours, tuned for an led rather than a screen (`#0000ff` reads as dim violet on real hardware) |
 | 05 | **`lamp @read`** | applies a saved scene. namespaced behind `@` so a scene can never collide with a built-in |
 | 06 | **`lamp scene desk`** | saves whatever the lamp is showing right now. the values worth keeping are the ones you found by eye |
-| 07 | **`lamp status`** | `on  80%  4000K`, in about 40ms |
+| 07 | **`lamp status`** | `on  80%  4000K`, in about 40ms. `--json` on this and `lamp scenes` for scripts |
 | 08 | **`lamp setup`** | signs in to xiaomi, answers the captcha and the emailed code, hands you the device token. needed once, ever |
 
 ## 🚀 Run it
@@ -64,10 +64,10 @@ lamp setup
 `setup` puts the device token on your clipboard. It goes in your environment, never in a file:
 
 ```bash
-echo 'export LAMP_TOKEN=<paste>' >> ~/.zsh_secrets
+export LAMP_TOKEN=<paste>
 ```
 
-Pick a file your shell exports but your dotfiles repo does not track. The `export` matters: a bare assignment is a shell variable, and child processes never see it. With the token outside the config, `config.toml` holds nothing secret and can be read, synced or committed without thinking about it.
+Put that line in whatever file your shell sources at startup, and pick one your dotfiles repo does not track. The `export` matters: a bare assignment is a shell variable, and child processes never see it. With the token outside the config, `config.toml` holds nothing secret and can be read, synced or committed without thinking about it.
 
 ## 🤖 For agents
 
