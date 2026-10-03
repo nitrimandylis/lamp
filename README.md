@@ -44,7 +44,7 @@ nick@lamp:~$ lamp 20 && lamp warm
 | 01 | **`lamp`** | toggles. that is all it does, so never use it to reach a known state |
 | 02 | **`lamp 20`** | brightness, 0 to 100. `lamp 0` is off, because you meant off |
 | 03 | **`lamp 2700k`** | colour temperature, 1700 to 6500. the `k` is required so `20` and `2700` can never be confused |
-| 04 | **`lamp red`** | 17 named colours, tuned for an led rather than a screen (`#0000ff` reads as dim violet on real hardware) |
+| 04 | **`lamp red`** | 17 named colours, tuned for an led rather than a screen (`#0000ff` reads as dim violet on real hardware). override them under `[colours]` in the config (`[colors]` works too) |
 | 05 | **`lamp @read`** | applies a saved scene. namespaced behind `@` so a scene can never collide with a built-in |
 | 06 | **`lamp scene desk`** | saves whatever the lamp is showing right now. the values worth keeping are the ones you found by eye |
 | 07 | **`lamp status`** | `on  80%  4000K`, in about 40ms. `--json` on this and `lamp scenes` for scripts |
@@ -92,7 +92,7 @@ A miIO packet is a 32-byte header (magic, length, device id, the device's own cl
 | file | job |
 |---|---|
 | `lamp.ts` | the command vocabulary. `parseValue()` is the single definition of what `80`, `2700k` and `red` mean, so the cli and scene building can never disagree |
-| `miio.ts` | the protocol in 127 lines. aes, checksums, handshake, and three retries because the lamp's wi-fi sleeps and udp does not retransmit |
+| `miio.ts` | the protocol in 133 lines. aes, checksums, handshake, and three retries because the lamp's wi-fi sleeps and udp does not retransmit |
 | `cloud.ts` | one-time token retrieval. the captcha and 2fa flows are the reason it works where `miiocli cloud` returns access denied |
 | `lamp-cli/` | the agent-facing doc, copied into `~/.claude/skills` on compile |
 

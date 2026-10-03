@@ -83,6 +83,7 @@ overwriting or deleting one they did not explicitly name.
   which is idempotent. Never use bare `lamp` to reach a known state.
 - **`lamp scene <name>` with no values reads the lamp**, so it needs
   `$LAMP_TOKEN` and a reachable lamp. With values it does not.
+- **Colour overrides** go under `[colours]` in the config; `[colors]` is accepted as an alias (it wins if both set the same name).
 - **Scene names** accept only letters, digits, dashes and underscores.
 - **`--json` is reads only.** `status` and `scenes` take it; every other command
   is an action and signals through its exit code. Passing `--json` to an action

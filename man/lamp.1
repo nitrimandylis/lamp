@@ -40,6 +40,8 @@ A named colour:
 Case-insensitive. The values are tuned for an LED rather than a screen and can
 be overridden under
 .B [colours]
+(or its alias
+.BR [colors] )
 in the configuration file.
 .TP
 .BI # rrggbb
@@ -60,10 +62,12 @@ the configuration file and applied with
 Save the lamp's current state under
 .IR name ,
 overwriting it if it exists. This is the usual way to make one: set the lamp by
-eye until it looks right, then name it.
+eye until it looks right, then name it. This reads the lamp, so it needs
+.B LAMP_TOKEN
+and a reachable lamp.
 .TP
 .B scene \fIname\fR \fIvalue\fR...
-Save explicit values instead, for example
+Save explicit values instead (no token or lamp needed), for example
 .B lamp scene evening 40 2200k
 or
 .BR "lamp scene alarm 100 red" .
@@ -161,6 +165,12 @@ blue = "#0033cc"
 .PP
 Colour overrides are applied one at a time over the built-in names, so setting
 one does not remove the others.
+.B [colors]
+is accepted as an alias for
+.BR [colours] ;
+if both are present, entries in
+.B [colors]
+win.
 .SH EXIT STATUS
 Exits non-zero if the configuration is missing or invalid, if the argument is
 not understood, or if the lamp does not answer. A lamp that is switched off at
