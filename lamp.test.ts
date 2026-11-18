@@ -185,7 +185,7 @@ test("scene JSON keeps every key, nulling what the scene does not set", () => {
   });
 });
 
-import { averageBmp, screenToLamp, changedEnough } from "./sync";
+import { bmpPixels, dominantColour, screenToLamp, changedEnough } from "./sync";
 
 test("sync averages a BMP and maps it to a pure hue plus brightness", () => {
   // 2x1 top-down 24-bit BMP: one red pixel, one black pixel, row padded to 8 bytes.
@@ -196,12 +196,19 @@ test("sync averages a BMP and maps it to a pure hue plus brightness", () => {
   bmp.writeInt32LE(-1, 22);
   bmp.writeUInt16LE(24, 28);
   bmp[54 + 2] = 200; // first pixel is B,G,R = 0,0,200
-  expect(averageBmp(bmp)).toEqual([100, 0, 0]);
+  expect(bmpPixels(bmp)).toEqual([[200, 0, 0], [0, 0, 0]]);
+
+  // A vivid red pixel outweighs a grey one, so the mix stays red, not beige.
+  const [r, g, b] = dominantColour([[255, 0, 0], [128, 128, 128]]);
+  expect(r).toBeGreaterThan(200);
+  expect(g).toBeLessThan(40);
+  expect(dominantColour([[128, 128, 128]])).toEqual([128, 128, 128]);
 
   const lamp = screenToLamp([100, 0, 0]);
   expect(lamp.rgb).toBe(0xff0000); // dark red becomes pure red, dimmed
-  expect(screenToLamp([0, 0, 0]).brightness).toBe(3);
-  expect(screenToLamp([255, 255, 255]).brightness).toBe(80);
+  expect(screenToLamp([255, 128, 0]).rgb >> 8 & 0xff).toBeLessThan(80); // orange stays orange in linear light
+  expect(screenToLamp([0, 0, 0]).brightness).toBe(5);
+  expect(screenToLamp([0, 0, 255]).brightness).toBe(100); // deep blue is not dim
   expect(changedEnough(lamp, lamp)).toBe(false);
   expect(changedEnough(null, lamp)).toBe(true);
 });

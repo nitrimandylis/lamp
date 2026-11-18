@@ -48,7 +48,7 @@ nick@lamp:~$ lamp 20 && lamp warm
 | 05 | **`lamp @read`** | applies a saved scene. namespaced behind `@` so a scene can never collide with a built-in |
 | 06 | **`lamp scene desk`** | saves whatever the lamp is showing right now. the values worth keeping are the ones you found by eye |
 | 07 | **`lamp status`** | `on  80%  4000K`, in about 40ms. `--json` on this and `lamp scenes` for scripts |
-| 08 | **`lamp sync`** | the lamp follows the screen's colour, fading every 1.5s, until ctrl-c puts it back how it was. foreground only, never a daemon. `lamp sync 2` for a second display |
+| 08 | **`lamp sync`** | the lamp follows the screen's colour, about 3 times a second, until ctrl-c puts it back how it was. foreground only, never a daemon. `lamp sync 2` for a second display |
 | 09 | **`lamp setup`** | signs in to xiaomi, answers the captcha and the emailed code, hands you the device token. needed once, ever |
 
 ## 🚀 Run it
