@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync } from "node:fs";
 import { Device, LampUnreachable } from "./miio";
+import { sync } from "./sync";
 import { passwordLogin, devicesOn, ask, SERVERS, type CloudDevice } from "./cloud";
 
 const CONFIG_PATH = join(homedir(), ".config", "lamp", "config.toml");
@@ -31,6 +32,7 @@ Usage:
   lamp @<scene>        apply a scene from config.toml
   lamp status          show current state
   lamp status --json   the same, as one JSON object
+  lamp sync [display]  follow the screen's colour until Ctrl-C, then restore
 
 Scenes:
   lamp scene <name>            save the lamp's current state as <name>
@@ -379,6 +381,8 @@ async function main() {
 
   const cfg = await loadConfig();
   const dev = new Device(cfg.ip, Buffer.from(cfg.token, "hex"));
+  if (arg === "sync") return void (await sync(dev, argv[1] === undefined ? undefined : Number(argv[1])));
+
   const current = await readCurrent(dev);
 
   if (arg === "status") {

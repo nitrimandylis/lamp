@@ -184,3 +184,24 @@ test("scene JSON keeps every key, nulling what the scene does not set", () => {
     rgb: "#ff3000",
   });
 });
+
+import { averageBmp, screenToLamp, changedEnough } from "./sync";
+
+test("sync averages a BMP and maps it to a pure hue plus brightness", () => {
+  // 2x1 top-down 24-bit BMP: one red pixel, one black pixel, row padded to 8 bytes.
+  const bmp = Buffer.alloc(54 + 8);
+  bmp.write("BM", 0, "ascii");
+  bmp.writeUInt32LE(54, 10);
+  bmp.writeInt32LE(2, 18);
+  bmp.writeInt32LE(-1, 22);
+  bmp.writeUInt16LE(24, 28);
+  bmp[54 + 2] = 200; // first pixel is B,G,R = 0,0,200
+  expect(averageBmp(bmp)).toEqual([100, 0, 0]);
+
+  const lamp = screenToLamp([100, 0, 0]);
+  expect(lamp.rgb).toBe(0xff0000); // dark red becomes pure red, dimmed
+  expect(screenToLamp([0, 0, 0]).brightness).toBe(3);
+  expect(screenToLamp([255, 255, 255]).brightness).toBe(80);
+  expect(changedEnough(lamp, lamp)).toBe(false);
+  expect(changedEnough(null, lamp)).toBe(true);
+});

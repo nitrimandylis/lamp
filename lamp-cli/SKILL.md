@@ -53,6 +53,10 @@ it times out. Hand the user the command and let them run it themselves.
 
 It is only ever needed once, or again if the lamp is factory reset.
 
+**`lamp sync`** runs until interrupted, so as a tool call it never returns.
+Hand it to the user, or run it in the background and stop it with SIGTERM
+(which restores the lamp). Background jobs ignore SIGINT.
+
 ## Writes to the user's config
 
 `lamp scene <name>` and `lamp scene rm <name>` rewrite

@@ -65,6 +65,13 @@ What the attempt did establish, for anyone tempted again:
 - The active swatch theme is readable without modifying swatch: the theme name
   from the Ghostty config it generates, the accent from the palette beside it.
 
+## lamp sync
+
+The one exception to "not automated", added 2026-11-18 for the bedroom TV:
+the lamp follows the screen while a film plays. It is not the reconciler come
+back, because it runs in the foreground, only when typed, and puts the lamp back
+exactly as it was on exit. Nothing runs when nobody asked.
+
 ## Not doing
 
 - Remote control from outside the network. That needs a home hub; same-Wi-Fi is
